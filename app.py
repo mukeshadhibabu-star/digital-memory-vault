@@ -30,6 +30,7 @@ def home():
 # ---------------- REGISTER ----------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+
     if request.method == 'POST':
         name = request.form['name']
         email = request.form['email']
@@ -49,6 +50,7 @@ def register():
 # ---------------- LOGIN ----------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
@@ -57,6 +59,7 @@ def login():
         user = cursor.fetchone()
 
         if user and check_password_hash(user[3], password):
+
             session['user_id'] = user[0]
 
             cursor.execute(
@@ -75,6 +78,7 @@ def login():
 # ---------------- DASHBOARD ----------------
 @app.route('/dashboard')
 def dashboard():
+
     if 'user_id' not in session:
         return redirect('/login')
 
@@ -84,17 +88,14 @@ def dashboard():
 # ---------------- UPLOAD ----------------
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
+
     if 'user_id' not in session:
         return redirect('/login')
 
     if request.method == 'POST':
+
         file = request.files['file']
         category_id = request.form['category']
-        title = request.form.get('title')
-        description = request.form.get('description')
-
-        if file.filename == '':
-            return "No file selected"
 
         filename = secure_filename(file.filename)
         unique_filename = str(uuid.uuid4()) + "_" + filename
@@ -104,21 +105,17 @@ def upload():
 
         cursor.execute("""
             INSERT INTO documents
-            (user_id, category_id, file_name, file_path, description)
-            VALUES (%s,%s,%s,%s,%s)
-        """, (
-            session['user_id'],
-            category_id,
-            unique_filename,
-            filepath,
-            description
-        ))
+            (user_id, category_id, file_name, file_path)
+            VALUES (%s,%s,%s,%s)
+        """, (session['user_id'], category_id, unique_filename, filepath))
+
         db.commit()
 
         cursor.execute("""
             INSERT INTO access_logs(user_id,action)
             VALUES(%s,%s)
         """, (session['user_id'], "Uploaded File"))
+
         db.commit()
 
         return redirect('/files')
@@ -129,16 +126,21 @@ def upload():
 # ---------------- FILE LIST ----------------
 @app.route('/files')
 def files():
+
     if 'user_id' not in session:
         return redirect('/login')
 
     cursor.execute("""
-        SELECT documents.id, documents.file_name, categories.category_name
+        SELECT documents.id,
+               documents.file_name,
+               categories.category_name
         FROM documents
         JOIN categories ON documents.category_id = categories.id
-    """)
+        WHERE documents.user_id=%s
+    """, (session['user_id'],))
 
     data = cursor.fetchall()
+
     return render_template('files.html', files=data)
 
 
@@ -146,19 +148,27 @@ def files():
 @app.route('/view/<int:file_id>')
 def view_file(file_id):
 
-    cursor.execute("SELECT file_path FROM documents WHERE id=%s", (file_id,))
+    cursor.execute(
+        "SELECT file_path FROM documents WHERE id=%s",
+        (file_id,)
+    )
+
     file = cursor.fetchone()
 
     if not file:
         return "File Not Found"
 
-    filepath = os.path.abspath(file[0])
+    filepath = file[0]
 
+    # Text / Code files
     if filepath.endswith(('.txt', '.py', '.java')):
+
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
-        return render_template("view_file.html", content=content)
 
+        return f"<pre>{content}</pre>"
+
+    # PDF / Images
     return send_file(filepath)
 
 
@@ -166,15 +176,24 @@ def view_file(file_id):
 @app.route('/delete/<int:file_id>')
 def delete_file(file_id):
 
-    cursor.execute("SELECT file_path FROM documents WHERE id=%s", (file_id,))
+    cursor.execute(
+        "SELECT file_path FROM documents WHERE id=%s",
+        (file_id,)
+    )
+
     file = cursor.fetchone()
 
     if file:
+
         path = file[0]
+
         if os.path.exists(path):
             os.remove(path)
 
-        cursor.execute("DELETE FROM documents WHERE id=%s", (file_id,))
+        cursor.execute(
+            "DELETE FROM documents WHERE id=%s",
+            (file_id,)
+        )
         db.commit()
 
     return redirect('/files')
@@ -188,6 +207,7 @@ def passwords():
         return redirect('/login')
 
     if request.method == 'POST':
+
         website = request.form['website']
         username = request.form['username']
         password = request.form['password']
@@ -202,7 +222,15 @@ def passwords():
 
         return redirect('/passwords')
 
-    return render_template('password_vault.html')
+    cursor.execute("""
+        SELECT website, username, password
+        FROM password_vault
+        WHERE user_id=%s
+    """, (session['user_id'],))
+
+    data = cursor.fetchall()
+
+    return render_template('password_vault.html', data=data)
 
 
 # ---------------- LOGS ----------------
@@ -212,7 +240,11 @@ def logs():
     if 'user_id' not in session:
         return redirect('/login')
 
-    cursor.execute("SELECT * FROM access_logs")
+    cursor.execute(
+        "SELECT * FROM access_logs WHERE user_id=%s",
+        (session['user_id'],)
+    )
+
     data = cursor.fetchall()
 
     return render_template('logs.html', logs=data)
