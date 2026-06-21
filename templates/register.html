@@ -1,29 +1,105 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Register</title>
+    <title>Register</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            width: 320px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        input:focus {
+            border-color: #4facfe;
+            box-shadow: 0 0 5px #4facfe;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #4facfe;
+            border: none;
+            color: white;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #00c6ff;
+        }
+
+        p {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        a {
+            color: #4facfe;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+
 </head>
 
 <body>
 
-<h2>Register</h2>
+<div class="container">
 
-<form method="POST">
+    <h2>Create Account</h2>
 
-<input type="text" name="name" placeholder="Name"><br><br>
-<input type="email" name="email" placeholder="Email"><br><br>
-<input type="password" name="password" placeholder="Password"><br><br>
+    <form method="POST">
 
-<button>Register</button>
+        <input type="text" name="name" placeholder="Full Name" required>
+        <input type="email" name="email" placeholder="Email Address" required>
+        <input type="password" name="password" placeholder="Password" required>
 
-</form>
+        <button type="submit">Register</button>
 
-<br>
+    </form>
 
-<p>
-Already have an account?
-<a href="/login">Login here</a>
-</p>
+    <p>
+        Already have an account?
+        <a href="/login">Login here</a>
+    </p>
+
+</div>
 
 </body>
 </html>
