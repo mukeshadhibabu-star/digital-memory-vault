@@ -86,6 +86,26 @@ def dashboard():
 
 
 # ---------------- UPLOAD ----------------
+# Create uploads folder if it doesn't exist
+UPLOAD_FOLDER = "uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Allowed file types
+ALLOWED_EXTENSIONS = {
+    'pdf', 'png', 'jpg', 'jpeg',
+    'txt', 'docx', 'pptx',
+    'xlsx', 'py', 'java'
+}
+
+def allowed_file(filename):
+    return (
+        '.' in filename and
+        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    )
+
+
+# ---------------- UPLOAD ----------------
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
 
@@ -94,34 +114,61 @@ def upload():
 
     if request.method == 'POST':
 
+        # Check if file is selected
+        if 'file' not in request.files:
+            return "No file selected."
+
         file = request.files['file']
+
+        if file.filename == '':
+            return "Please choose a file."
+
+        # Validate file type
+        if not allowed_file(file.filename):
+            return "Invalid file type."
+
         category_id = request.form['category']
 
+        # Secure filename
         filename = secure_filename(file.filename)
-        unique_filename = str(uuid.uuid4()) + "_" + filename
+        unique_filename = f"{uuid.uuid4()}_{filename}"
 
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        filepath = os.path.join(
+            app.config['UPLOAD_FOLDER'],
+            unique_filename
+        )
+
+        # Save file
         file.save(filepath)
 
+        # Save file details in database
         cursor.execute("""
             INSERT INTO documents
             (user_id, category_id, file_name, file_path)
-            VALUES (%s,%s,%s,%s)
-        """, (session['user_id'], category_id, unique_filename, filepath))
+            VALUES (%s, %s, %s, %s)
+        """, (
+            session['user_id'],
+            category_id,
+            filename,          # Original filename
+            filepath
+        ))
 
         db.commit()
 
+        # Store upload log
         cursor.execute("""
-            INSERT INTO access_logs(user_id,action)
-            VALUES(%s,%s)
-        """, (session['user_id'], "Uploaded File"))
+            INSERT INTO access_logs(user_id, action)
+            VALUES (%s, %s)
+        """, (
+            session['user_id'],
+            "Uploaded File"
+        ))
 
         db.commit()
 
-        return redirect('/files')
+        return render_template("upload_success.html")
 
-    return render_template('upload.html')
-
+    return render_template("upload.html")
 
 # ---------------- FILE LIST ----------------
 @app.route('/files')
@@ -131,18 +178,17 @@ def files():
         return redirect('/login')
 
     cursor.execute("""
-        SELECT documents.id,
-               documents.file_name,
-               categories.category_name
+        SELECT id, file_name, category_id
         FROM documents
-        JOIN categories ON documents.category_id = categories.id
-        WHERE documents.user_id=%s
+        WHERE user_id=%s
     """, (session['user_id'],))
 
     data = cursor.fetchall()
 
-    return render_template('files.html', files=data)
-
+    return render_template(
+        'files.html',
+        files=data
+    )
 
 # ---------------- VIEW FILE ----------------
 @app.route('/view/<int:file_id>')
