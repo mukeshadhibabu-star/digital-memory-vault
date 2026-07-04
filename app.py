@@ -106,6 +106,27 @@ def allowed_file(filename):
 
 
 # ---------------- UPLOAD ----------------
+# ---------------- UPLOAD ----------------
+
+# Create uploads folder if it doesn't exist
+UPLOAD_FOLDER = "uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Allowed file types
+ALLOWED_EXTENSIONS = {
+    'pdf', 'png', 'jpg', 'jpeg',
+    'txt', 'docx', 'doc',
+    'ppt', 'pptx',
+    'xls', 'xlsx',
+    'py', 'java'
+}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
 
@@ -114,62 +135,63 @@ def upload():
 
     if request.method == 'POST':
 
-        # Check if file is selected
-        if 'file' not in request.files:
-            return "No file selected."
+        try:
 
-        file = request.files['file']
+            if 'file' not in request.files:
+                return "No file selected."
 
-        if file.filename == '':
-            return "Please choose a file."
+            file = request.files['file']
 
-        # Validate file type
-        if not allowed_file(file.filename):
-            return "Invalid file type."
+            if file.filename == '':
+                return "Please choose a file."
 
-        category_id = request.form['category']
+            if not allowed_file(file.filename):
+                return "Invalid file type."
 
-        # Secure filename
-        filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4()}_{filename}"
+            category_id = request.form['category']
 
-        filepath = os.path.join(
-            app.config['UPLOAD_FOLDER'],
-            unique_filename
-        )
+            filename = secure_filename(file.filename)
+            unique_filename = str(uuid.uuid4()) + "_" + filename
 
-        # Save file
-        file.save(filepath)
+            filepath = os.path.join(
+                app.config['UPLOAD_FOLDER'],
+                unique_filename
+            )
 
-        # Save file details in database
-        cursor.execute("""
-            INSERT INTO documents
-            (user_id, category_id, file_name, file_path)
-            VALUES (%s, %s, %s, %s)
-        """, (
-            session['user_id'],
-            category_id,
-            filename,          # Original filename
-            filepath
-        ))
+            # Save file
+            file.save(filepath)
 
-        db.commit()
+            # Save into database
+            cursor.execute("""
+                INSERT INTO documents
+                (user_id, category_id, file_name, file_path)
+                VALUES (%s,%s,%s,%s)
+            """, (
+                session['user_id'],
+                category_id,
+                unique_filename,
+                filepath
+            ))
 
-        # Store upload log
-        cursor.execute("""
-            INSERT INTO access_logs(user_id, action)
-            VALUES (%s, %s)
-        """, (
-            session['user_id'],
-            "Uploaded File"
-        ))
+            db.commit()
 
-        db.commit()
+            # Save activity log
+            cursor.execute("""
+                INSERT INTO access_logs(user_id,action)
+                VALUES(%s,%s)
+            """, (
+                session['user_id'],
+                "Uploaded File"
+            ))
 
-        return render_template("upload_success.html")
+            db.commit()
+
+            return redirect('/files')
+
+        except Exception as e:
+            return f"Upload Error : {e}"
 
     return render_template("upload.html")
-
 # ---------------- FILE LIST ----------------
 @app.route('/files')
 def files():
@@ -178,7 +200,29 @@ def files():
         return redirect('/login')
 
     cursor.execute("""
-        SELECT id, file_name, category_id
+        SELECT id, file_name,
+        CASE category_id
+            WHEN 1 THEN 'Certificates'
+            WHEN 2 THEN 'Notes'
+            WHEN 3 THEN 'Assignments'
+            WHEN 4 THEN 'Projects'
+            WHEN 5 THEN 'Resume / CV'
+            WHEN 6 THEN 'Study Materials'
+            WHEN 7 THEN 'Question Papers'
+            WHEN 8 THEN 'Photos'
+            WHEN 9 THEN 'Videos'
+            WHEN 10 THEN 'Audio Files'
+            WHEN 11 THEN 'ID Proof'
+            WHEN 12 THEN 'Bank Documents'
+            WHEN 13 THEN 'Internship Documents'
+            WHEN 14 THEN 'Personal Documents'
+            WHEN 15 THEN 'Bills'
+            WHEN 16 THEN 'Certificates & Awards'
+            WHEN 17 THEN 'Password Backup'
+            WHEN 18 THEN 'Others'
+            WHEN 19 THEN 'Custom'
+            ELSE 'Unknown'
+        END AS category_name
         FROM documents
         WHERE user_id=%s
     """, (session['user_id'],))
@@ -189,7 +233,6 @@ def files():
         'files.html',
         files=data
     )
-
 # ---------------- VIEW FILE ----------------
 @app.route('/view/<int:file_id>')
 def view_file(file_id):
